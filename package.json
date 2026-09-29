@@ -1,0 +1,22 @@
+{
+  "name": "devflow",
+  "version": "2.0.0",
+  "description": "DevFlow - Modern Agile Workspace (React.js, Node.js, Express.js, MySQL)",
+  "scripts": {
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "init-db": "cd backend && node config/initDb.js",
+    "test-e2e": "cd backend && node test-e2e.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.4",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.24.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
