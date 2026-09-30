@@ -31,6 +31,23 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  avatar: {
+    type: String,
+    default: "",
+  },
+  googleId: {
+    type: String,
+    default: null,
+  },
+  githubId: {
+    type: String,
+    default: null,
+  },
+  authProvider: {
+    type: String,
+    enum: ["local", "google", "github"],
+    default: "local",
+  },
 }, {
   timestamps: true,
 });

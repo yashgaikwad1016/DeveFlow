@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+import { NavLink, Link, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { notificationService, dashboardService } from '../services';
+import DevFlowLogo from '../components/brand/DevFlowLogo';
 
 import Icon from '../components/Icon';
 import { Avatar } from '../components/UI';
@@ -128,10 +129,9 @@ export default function AppLayout({ org }) {
     <div className="layout">
       {/* Sidebar */}
       <aside className={`sidebar${sideOpen ? ' open' : ''}`} id="sidebar">
-        <div className="brand">
-          <span className="brand-logo"></span>
-          <span className="app-name">DevFlow</span>
-        </div>
+        <Link to="/dashboard" className="sidebar-brand-link" aria-label="DevFlow Dashboard">
+          <DevFlowLogo variant="navbar" priority={true} />
+        </Link>
         <div className="org-chip" title={org || 'My organization'}>
           <span className="org-badge-icon">
             <Icon name="folder" />

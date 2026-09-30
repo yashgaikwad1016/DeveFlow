@@ -71,5 +71,25 @@ authRouter.post("/verify-email", verifyEmailLimiter, authController.verifyEmail)
  */
 authRouter.post("/resend-otp", resendOtpLimiter, authController.resendOTP);
 
+/**
+ * POST /api/auth/google
+ */
+authRouter.post("/google", authController.googleLogin);
+
+/**
+ * GET /api/auth/google-client-id
+ */
+authRouter.get("/google-client-id", authController.getGoogleClientId);
+
+/**
+ * POST /api/auth/github
+ */
+authRouter.post("/github", authController.githubLogin);
+
+/**
+ * GET /api/auth/github-client-id
+ */
+authRouter.get("/github-client-id", authController.getGithubClientId);
+
 export default authRouter;
 

@@ -69,6 +69,48 @@ input[type=file]{padding:8px;background:var(--surface-2)}
 .brand-logo{width:34px;height:34px;border-radius:10px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 4 14h7l-1 8 9-12h-7z' fill='%234f46e5'/%3E%3C/svg%3E") center/20px no-repeat;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 .sidebar .brand-logo{background-color:transparent;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 4 14h7l-1 8 9-12h-7z' fill='white'/%3E%3C/svg%3E"),linear-gradient(135deg,#4f46e5,#db2777)}
 
+/* DevFlow Brand Logo System (Global) */
+.devflow-brand-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  user-select: none;
+  line-height: 0;
+}
+.devflow-brand-logo-img {
+  display: block;
+  width: auto;
+  object-fit: contain;
+  transition: filter 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s ease, opacity 0.2s ease;
+}
+[data-theme="light"] .devflow-brand-logo-img {
+  filter: invert(1) brightness(0.12) contrast(1.2);
+}
+[data-theme="dark"] .devflow-brand-logo-img,
+:root:not([data-theme="light"]) .devflow-brand-logo-img {
+  filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.06));
+}
+.devflow-logo-navbar .devflow-brand-logo-img {
+  height: 36px;
+  max-width: 140px;
+}
+/* Always maintain crisp white logo in dark backgrounds (sidebar & hero gradient banner) */
+.hero .devflow-brand-logo-img,
+.sidebar .devflow-brand-logo-img {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25)) !important;
+}
+.sidebar-brand-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 4px 0 8px 4px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.sidebar-brand-link:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
 /* ---------- Layout ---------- */
 .layout{display:flex;min-height:100vh}
 .sidebar{width:252px;flex:none;background:var(--side);color:var(--side-text);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
@@ -419,6 +461,41 @@ td .sub{font-size:12px;color:var(--muted)}
   margin-bottom: 28px;
 }
 
+/* Auth Brand Logo Badge with background & proper shadow */
+.auth-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 30px;
+  margin: 0 auto 18px auto;
+  border-radius: 20px;
+  background: radial-gradient(circle at 50% 30%, rgba(30, 41, 59, 0.95) 0%, rgba(13, 19, 33, 0.98) 100%);
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  box-shadow: 
+    0 14px 36px -4px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(99, 102, 241, 0.35),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  text-decoration: none;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.auth-logo-badge:hover {
+  transform: translateY(-2px);
+  border-color: rgba(129, 140, 248, 0.75);
+  box-shadow: 
+    0 18px 45px -4px rgba(0, 0, 0, 0.9),
+    0 0 40px rgba(99, 102, 241, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35);
+}
+
+.auth-logo-badge .devflow-brand-logo-img {
+  height: 54px !important;
+  max-width: 220px !important;
+  filter: drop-shadow(0 2px 14px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 12px rgba(129, 140, 248, 0.35)) !important;
+}
+
 .auth-brand-badge {
   display: inline-block;
   padding: 4px 14px;
@@ -555,6 +632,134 @@ td .sub{font-size:12px;color:var(--muted)}
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ---------- Social Google Auth ---------- */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 22px 0 16px;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.auth-divider span {
+  padding: 0 12px;
+}
+
+.google-auth-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.google-btn-native-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.google-signin-custom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  padding: 11px 20px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.google-signin-custom-btn:hover:not(:disabled) {
+  background: rgba(30, 41, 59, 1);
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25);
+  transform: translateY(-1px);
+}
+
+.google-signin-custom-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.google-icon {
+  flex-shrink: 0;
+}
+
+.oauth-buttons-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+}
+
+.github-auth-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.github-signin-custom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  padding: 11px 20px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.github-signin-custom-btn:hover:not(:disabled) {
+  background: rgba(30, 41, 59, 1);
+  border-color: rgba(148, 163, 184, 0.7);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.github-signin-custom-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.github-icon {
+  flex-shrink: 0;
+  color: #f8fafc;
 }
 
 .auth-footer {

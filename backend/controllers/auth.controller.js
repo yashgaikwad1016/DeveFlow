@@ -512,3 +512,366 @@ export async function resendOTP(req, res) {
     });
   }
 }
+
+// ✅ GOOGLE LOGIN
+export async function googleLogin(req, res) {
+  try {
+    const { credential, token, accessToken } = req.body;
+    const idToken = credential || token;
+
+    if (!idToken && !accessToken) {
+      return res.status(400).json({ message: "Google credential or token is required" });
+    }
+
+    let googleUser = null;
+
+    if (idToken) {
+      // Verify Google ID Token via Google's tokeninfo endpoint
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Google token verification failed:", errText);
+        return res.status(401).json({ message: "Invalid or expired Google credential" });
+      }
+      googleUser = await response.json();
+    } else if (accessToken) {
+      // Verify via Google userinfo endpoint
+      const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) {
+        return res.status(401).json({ message: "Invalid Google access token" });
+      }
+      googleUser = await response.json();
+    }
+
+    if (!googleUser || !googleUser.email) {
+      return res.status(400).json({ message: "Could not retrieve email from Google profile" });
+    }
+
+    const email = googleUser.email.toLowerCase().trim();
+    const name = googleUser.name || googleUser.given_name || email.split("@")[0];
+
+    // Find existing user by email
+    let user = await userModel.findOne({ email });
+
+    if (!user) {
+      // Generate a unique clean username
+      let baseUsername = name.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || email.split("@")[0];
+      if (baseUsername.length < 3) baseUsername = `user_${baseUsername}`;
+      let username = baseUsername;
+      let counter = 1;
+      while (await userModel.findOne({ username })) {
+        username = `${baseUsername}${counter++}`;
+      }
+
+      // Secure random password for Google-authenticated user
+      const randomPassword = crypto.randomBytes(32).toString("hex");
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = await userModel.create({
+        username,
+        email,
+        password: hashedPassword,
+        verified: true, // Google pre-verifies email
+        role: "Member",
+        designation: "Google Member",
+        avatar: googleUser.picture || "",
+        googleId: googleUser.sub || null,
+        authProvider: "google",
+      });
+    } else {
+      // If user was not verified yet, Google login proves email ownership
+      let needsSave = false;
+      if (!user.verified) {
+        user.verified = true;
+        needsSave = true;
+      }
+      if (!user.googleId && googleUser.sub) {
+        user.googleId = googleUser.sub;
+        needsSave = true;
+      }
+      if (googleUser.picture && !user.avatar) {
+        user.avatar = googleUser.picture;
+        needsSave = true;
+      }
+      if (needsSave) {
+        await user.save();
+      }
+    }
+
+    // Sync user with MySQL users table for workspace foreign keys
+    const mysqlId = await syncUserToMySQL(user);
+
+    // 7-day Refresh Token
+    const refreshToken = jwt.sign(
+      { id: user._id },
+      config.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+
+    // Save session in MongoDB
+    const session = await sessionModel.create({
+      user: user._id,
+      refreshTokenHash,
+      ip: req.ip || req.connection.remoteAddress || "127.0.0.1",
+      userAgent: req.headers["user-agent"] || "google-auth",
+    });
+
+    // 15-minute Access Token
+    const appAccessToken = jwt.sign(
+      {
+        id: user._id,
+        mysql_id: mysqlId,
+        sessionId: session._id,
+        email: user.email,
+        role: user.role || "Member",
+      },
+      config.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    // Set HTTP-Only Cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      message: "Logged in with Google successfully",
+      user: {
+        id: mysqlId || user._id,
+        user_id: mysqlId || user._id,
+        mongo_id: user._id,
+        username: user.username,
+        name: user.username,
+        email: user.email,
+        role: user.role || "Member",
+        designation: user.designation || "",
+        verified: user.verified,
+        picture: googleUser.picture || null,
+        avatar: user.avatar || googleUser.picture || null,
+      },
+      accessToken: appAccessToken,
+      token: appAccessToken,
+    });
+  } catch (error) {
+    console.error("Google Login Error:", error);
+    res.status(500).json({
+      message: "Google login server error",
+      error: error.message,
+    });
+  }
+}
+
+// ✅ GET GOOGLE CLIENT ID
+export function getGoogleClientId(req, res) {
+  res.status(200).json({
+    clientId: config.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "",
+  });
+}
+
+// ✅ GITHUB LOGIN
+export async function githubLogin(req, res) {
+  try {
+    const { code, redirectUri } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ message: "GitHub authorization code is required" });
+    }
+
+    if (!config.GITHUB_CLIENT_ID || !config.GITHUB_CLIENT_SECRET) {
+      return res.status(400).json({
+        message: "GitHub OAuth is not configured on the server. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in backend/.env.",
+      });
+    }
+
+    // Exchange authorization code for GitHub access token
+    const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        client_id: config.GITHUB_CLIENT_ID,
+        client_secret: config.GITHUB_CLIENT_SECRET,
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+
+    if (tokenData.error || !tokenData.access_token) {
+      console.error("GitHub access token exchange error:", tokenData);
+      return res.status(401).json({
+        message: tokenData.error_description || "Failed to exchange GitHub authorization code",
+      });
+    }
+
+    const githubAccessToken = tokenData.access_token;
+
+    // Fetch user profile from GitHub API
+    const userProfileRes = await fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${githubAccessToken}`,
+        "User-Agent": "DevFlow-App",
+      },
+    });
+
+    if (!userProfileRes.ok) {
+      return res.status(401).json({ message: "Failed to fetch GitHub profile" });
+    }
+
+    const githubProfile = await userProfileRes.json();
+    let email = githubProfile.email;
+
+    // If email is null/private, fetch emails from GitHub user/emails endpoint
+    if (!email) {
+      const emailsRes = await fetch("https://api.github.com/user/emails", {
+        headers: {
+          Authorization: `Bearer ${githubAccessToken}`,
+          "User-Agent": "DevFlow-App",
+        },
+      });
+
+      if (emailsRes.ok) {
+        const emails = await emailsRes.json();
+        const primaryEmail = emails.find(e => e.primary && e.verified) || emails.find(e => e.verified) || emails[0];
+        if (primaryEmail) {
+          email = primaryEmail.email;
+        }
+      }
+    }
+
+    if (!email) {
+      email = `${githubProfile.login.toLowerCase()}@users.noreply.github.com`;
+    }
+
+    email = email.toLowerCase().trim();
+    const name = githubProfile.name || githubProfile.login;
+
+    // Find existing user by githubId or email
+    let user = await userModel.findOne({
+      $or: [{ githubId: String(githubProfile.id) }, { email }],
+    });
+
+    if (!user) {
+      let baseUsername = (githubProfile.login || name).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+      if (baseUsername.length < 3) baseUsername = `gh_${baseUsername}`;
+      let username = baseUsername;
+      let counter = 1;
+      while (await userModel.findOne({ username })) {
+        username = `${baseUsername}${counter++}`;
+      }
+
+      const randomPassword = crypto.randomBytes(32).toString("hex");
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = await userModel.create({
+        username,
+        email,
+        password: hashedPassword,
+        verified: true,
+        role: "Member",
+        designation: "GitHub Member",
+        avatar: githubProfile.avatar_url || "",
+        githubId: String(githubProfile.id),
+        authProvider: "github",
+      });
+    } else {
+      let needsSave = false;
+      if (!user.verified) {
+        user.verified = true;
+        needsSave = true;
+      }
+      if (!user.githubId) {
+        user.githubId = String(githubProfile.id);
+        needsSave = true;
+      }
+      if (githubProfile.avatar_url && !user.avatar) {
+        user.avatar = githubProfile.avatar_url;
+        needsSave = true;
+      }
+      if (needsSave) {
+        await user.save();
+      }
+    }
+
+    // Sync user with MySQL users table
+    const mysqlId = await syncUserToMySQL(user);
+
+    // 7-day Refresh Token
+    const refreshToken = jwt.sign(
+      { id: user._id },
+      config.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+
+    // Save session in MongoDB
+    const session = await sessionModel.create({
+      user: user._id,
+      refreshTokenHash,
+      ip: req.ip || req.connection.remoteAddress || "127.0.0.1",
+      userAgent: req.headers["user-agent"] || "github-auth",
+    });
+
+    // 15-minute Access Token
+    const appAccessToken = jwt.sign(
+      {
+        id: user._id,
+        mysql_id: mysqlId,
+        sessionId: session._id,
+        email: user.email,
+        role: user.role || "Member",
+      },
+      config.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    // Set HTTP-Only Cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      message: "Logged in with GitHub successfully",
+      user: {
+        id: mysqlId || user._id,
+        user_id: mysqlId || user._id,
+        mongo_id: user._id,
+        username: user.username,
+        name: user.username,
+        email: user.email,
+        role: user.role || "Member",
+        designation: user.designation || "",
+        verified: user.verified,
+        picture: githubProfile.avatar_url || user.avatar || null,
+        avatar: githubProfile.avatar_url || user.avatar || null,
+      },
+      accessToken: appAccessToken,
+      token: appAccessToken,
+    });
+  } catch (error) {
+    console.error("GitHub Login Error:", error);
+    res.status(500).json({
+      message: "GitHub login server error",
+      error: error.message,
+    });
+  }
+}
+
+// ✅ GET GITHUB CLIENT ID
+export function getGithubClientId(req, res) {
+  res.status(200).json({
+    clientId: config.GITHUB_CLIENT_ID || process.env.GITHUB_CLIENT_ID || "",
+  });
+}

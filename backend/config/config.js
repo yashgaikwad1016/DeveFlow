@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+// Configuration environment loader
 const config = {
   MONGO_URI: process.env.MONGODB_URI || process.env.MONGO_URI,
   JWT_SECRET: process.env.JWT_SECRET || 'devflow_default_dev_secret_key_please_override_in_production_32chars',
@@ -10,6 +11,8 @@ const config = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || process.env.CLIENT_SECRET,
   GOOGLE_REFRESH_TOKEN: process.env.GOOGLE_REFRESH_TOKEN || process.env.REFRESH_TOKEN,
   GOOGLE_USER: process.env.GOOGLE_USER || process.env.EMAIL_USER,
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
   PORT: process.env.PORT || 5000,
   
   // MySQL for project/sprint/task tracking

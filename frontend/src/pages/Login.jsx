@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import DevFlowLogo from '../components/brand/DevFlowLogo';
+import GoogleLoginButton from '../components/auth/GoogleLoginButton';
+import GithubLoginButton from '../components/auth/GithubLoginButton';
 
 const Login = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -11,9 +14,54 @@ const Login = () => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const auth = useAuth();
+
+  const handleGoogleSuccess = async (authData) => {
+    setGoogleLoading(true);
+    try {
+      const payload = typeof authData === 'string'
+        ? { credential: authData }
+        : authData;
+      const response = await api.post('/auth/google', payload);
+      const token = response.data.accessToken || response.data.token;
+      const user = response.data.user;
+
+      // Store session in sessionStorage
+      sessionStorage.setItem('accessToken', token);
+      sessionStorage.setItem('df_token', token);
+      if (user) {
+        sessionStorage.setItem('df_user', JSON.stringify(user));
+      }
+      try {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('df_token');
+        localStorage.removeItem('df_user');
+      } catch (e) {}
+
+      if (auth?.login) {
+        auth.login(token, user);
+      }
+
+      toast.success(`Welcome, ${user?.name || user?.username || 'Member'}!`);
+
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 350);
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
+      toast.error(error.response?.data?.message || 'Google Sign-In failed. Please try again.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleError = (err) => {
+    console.error('Google Auth Error:', err);
+    toast.error('Google Sign-In was cancelled or failed.');
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -123,6 +171,11 @@ const Login = () => {
         </div>
 
         <div className="auth-header">
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <Link to="/" className="auth-logo-badge" title="DevFlow - Return to Home">
+              <DevFlowLogo variant="hero" priority={true} />
+            </Link>
+          </div>
           <div className="auth-brand-badge">
             {isAdminMode ? '👑 Administrator Portal' : 'DevFlow Workspace'}
           </div>
@@ -187,14 +240,33 @@ const Login = () => {
         </form>
 
         {!isAdminMode && (
-          <div className="auth-footer">
-            <p>
-              Don't have an account?{' '}
-              <Link to="/register" className="auth-link">
-                Register
-              </Link>
-            </p>
-          </div>
+          <>
+            <div className="auth-divider">
+              <span>or continue with</span>
+            </div>
+
+            <div className="oauth-buttons-group">
+              <GoogleLoginButton
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                loading={googleLoading}
+                text="Continue with Google"
+              />
+
+              <GithubLoginButton
+                text="Continue with GitHub"
+              />
+            </div>
+
+            <div className="auth-footer">
+              <p>
+                Don't have an account?{' '}
+                <Link to="/register" className="auth-link">
+                  Register
+                </Link>
+              </p>
+            </div>
+          </>
         )}
       </div>
     </div>

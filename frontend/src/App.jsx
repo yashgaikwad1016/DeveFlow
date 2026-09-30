@@ -1,29 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth, isTokenExpired } from './context/AuthContext';
 import { ToastProvider, ModalProvider } from './components/Overlays';
 
-// Layout
+// Layout & Landing Page (Immediate)
 import AppLayout from './layouts/AppLayout';
+import LandingPage from './pages/LandingPage';
 
-// Auth Pages (JWT Auth System)
-import Login from './pages/Login';
-import Register from './pages/Register';
-import VerifyOTP from './pages/VerifyOTP';
+// Lazy-loaded Auth Pages
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const VerifyOTP = lazy(() => import('./pages/VerifyOTP'));
+const GitHubCallback = lazy(() => import('./pages/GitHubCallback'));
 
-// App Pages
-import DashboardPage from './pages/DashboardPage';
-import ProjectsPage from './pages/ProjectsPage';
-import SprintsPage from './pages/SprintsPage';
-import TasksPage from './pages/TasksPage';
-import IssuesPage from './pages/IssuesPage';
-import ReportsPage from './pages/ReportsPage';
-import AiInsightsPage from './pages/AiInsightsPage';
-import ActivityPage from './pages/ActivityPage';
-import UsersPage from './pages/UsersPage';
-import SettingsPage from './pages/SettingsPage';
-import ProfilePage from './pages/ProfilePage';
+// Lazy-loaded App Pages
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const SprintsPage = lazy(() => import('./pages/SprintsPage'));
+const TasksPage = lazy(() => import('./pages/TasksPage'));
+const IssuesPage = lazy(() => import('./pages/IssuesPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const AiInsightsPage = lazy(() => import('./pages/AiInsightsPage'));
+const ActivityPage = lazy(() => import('./pages/ActivityPage'));
+const UsersPage = lazy(() => import('./pages/UsersPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+
+// Lightweight Suspense Loader
+function SuspenseFallback() {
+  return (
+    <div style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+      <div style={{ width: 28, height: 28, border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'blobFloat 0.8s linear infinite' }}></div>
+    </div>
+  );
+}
 
 // Protected Route Component (Ensures valid authentication on every render/history navigation)
 function ProtectedLayout() {
@@ -77,103 +88,102 @@ export default function App() {
         <ToastProvider>
           <ModalProvider>
             <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-            <Routes>
-              {/* Public Auth Routes */}
-              <Route
-                path="/"
-                element={
-                  <PublicRoute>
-                    <Navigate to="/login" replace />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  <PublicRoute>
-                    <Register />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/verify-otp"
-                element={
-                  <PublicRoute>
-                    <VerifyOTP />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/auth"
-                element={
-                  <PublicRoute>
-                    <Navigate to="/login" replace />
-                  </PublicRoute>
-                }
-              />
+            <Suspense fallback={<SuspenseFallback />}>
+              <Routes>
+                {/* Public Landing & Auth Routes */}
+                <Route path="/" element={<LandingPage />} />
+                <Route
+                  path="/login"
+                  element={
+                    <PublicRoute>
+                      <Login />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    <PublicRoute>
+                      <Register />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/verify-otp"
+                  element={
+                    <PublicRoute>
+                      <VerifyOTP />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/auth/github/callback"
+                  element={<GitHubCallback />}
+                />
+                <Route
+                  path="/auth"
+                  element={
+                    <PublicRoute>
+                      <Navigate to="/login" replace />
+                    </PublicRoute>
+                  }
+                />
 
-              {/* Protected App Routes */}
-              <Route element={<ProtectedLayout />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/sprints" element={<SprintsPage />} />
-                <Route
-                  path="/tasks"
-                  element={
-                    <RoleRoute role="admin">
-                      <TasksPage />
-                    </RoleRoute>
-                  }
-                />
-                <Route
-                  path="/task/:id"
-                  element={
-                    <RoleRoute role="admin">
-                      <TasksPage />
-                    </RoleRoute>
-                  }
-                />
-                <Route path="/issues" element={<IssuesPage />} />
-                <Route
-                  path="/reports"
-                  element={
-                    <RoleRoute role="mgr">
-                      <ReportsPage />
-                    </RoleRoute>
-                  }
-                />
-                <Route path="/ai" element={<AiInsightsPage />} />
-                <Route path="/activity" element={<ActivityPage />} />
-                <Route
-                  path="/users"
-                  element={
-                    <RoleRoute role="admin">
-                      <UsersPage />
-                    </RoleRoute>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <RoleRoute role="admin">
-                      <SettingsPage />
-                    </RoleRoute>
-                  }
-                />
-                <Route path="/profile" element={<ProfilePage />} />
-              </Route>
+                {/* Protected App Routes */}
+                <Route element={<ProtectedLayout />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/projects" element={<ProjectsPage />} />
+                  <Route path="/sprints" element={<SprintsPage />} />
+                  <Route
+                    path="/tasks"
+                    element={
+                      <RoleRoute role="admin">
+                        <TasksPage />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="/task/:id"
+                    element={
+                      <RoleRoute role="admin">
+                        <TasksPage />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route path="/issues" element={<IssuesPage />} />
+                  <Route
+                    path="/reports"
+                    element={
+                      <RoleRoute role="mgr">
+                        <ReportsPage />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route path="/ai" element={<AiInsightsPage />} />
+                  <Route path="/activity" element={<ActivityPage />} />
+                  <Route
+                    path="/users"
+                    element={
+                      <RoleRoute role="admin">
+                        <UsersPage />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <RoleRoute role="admin">
+                        <SettingsPage />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route path="/profile" element={<ProfilePage />} />
+                </Route>
 
-              {/* Catch-all */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+                {/* Catch-all */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </Suspense>
           </ModalProvider>
         </ToastProvider>
       </AuthProvider>

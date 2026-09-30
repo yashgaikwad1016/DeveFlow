@@ -5,6 +5,7 @@ import { dashboardService } from '../services';
 import { Kpi, LoadingSpinner, Ring, Badge, Avatar, Person, Empty } from '../components/UI';
 import { Donut } from '../components/Charts';
 import Icon from '../components/Icon';
+import DevFlowLogo from '../components/brand/DevFlowLogo';
 import { fmtDate, isLate, STATUSES, STATUS_COLOR, ago } from '../utils/helpers';
 
 export default function DashboardPage() {
@@ -41,7 +42,21 @@ export default function DashboardPage() {
       {/* Hero Welcome Banner */}
       <div className="card hero" style={{ marginBottom: 20 }}>
         <div>
-          <h2>{greet}, {firstName}! 👋</h2>
+          <div style={{ marginBottom: 12, display: 'inline-flex' }}>
+            <DevFlowLogo variant="navbar" priority={true} style={{ height: 32 }} />
+          </div>
+          <h2>
+            {greet}, {firstName}! 👋
+            {isAdmin() ? (
+              <span className="badge b-Admin" style={{ verticalAlign: 'middle', fontSize: 12, marginLeft: 10, background: 'rgba(255,255,255,0.22)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)' }}>
+                👑 Admin Workspace
+              </span>
+            ) : (
+              <span className="badge" style={{ verticalAlign: 'middle', fontSize: 12, marginLeft: 10, background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)' }}>
+                Member Workspace
+              </span>
+            )}
+          </h2>
           <p>{dateStr} · Here is what is happening across your workspace today.</p>
         </div>
         <div className="hero-actions">

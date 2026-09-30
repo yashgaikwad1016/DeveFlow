@@ -79,6 +79,12 @@ export function AuthProvider({ children }) {
       await fetch('/api/auth/logout', { credentials: 'include' }).catch(() => {});
     } catch (e) {}
 
+    try {
+      if (window.google?.accounts?.id?.disableAutoSelect) {
+        window.google.accounts.id.disableAutoSelect();
+      }
+    } catch (e) {}
+
     sessionStorage.clear();
     try {
       localStorage.removeItem('df_token');
