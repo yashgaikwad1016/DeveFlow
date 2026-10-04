@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import userModel from '../models/user.model.js';
 import { query, one, run, now } from '../config/db.js';
-import { need, validEmail } from '../utils/helpers.js';
+import { need, validEmail, checkPassword } from '../utils/helpers.js';
 
 // GET /api/users
 export async function listUsers(req, res) {
@@ -42,7 +42,13 @@ export async function createUser(req, res) {
     need(b, 'name', 'email', 'password');
     const email = b.email.trim().toLowerCase();
     const username = b.name.trim();
-    const role = b.role || 'Member';
+    const role = b.role && ['Admin', 'Manager', 'Member'].includes(b.role) ? b.role : 'Member';
+
+    if (!validEmail(email)) {
+      return res.status(400).json({ error: 'A valid email address is required' });
+    }
+
+    checkPassword(b.password);
 
     const existing = await userModel.findOne({ $or: [{ email }, { username }] });
     if (existing) {
@@ -55,6 +61,7 @@ export async function createUser(req, res) {
       username,
       email,
       password: hashedPassword,
+      passwordHistory: [hashedPassword],
       role,
       designation: b.designation?.trim() || '',
       verified: true, // Admin-created user is auto-verified
@@ -70,7 +77,7 @@ export async function createUser(req, res) {
 
     res.json({ message: 'User created successfully', user: newUser });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 }
 
@@ -89,15 +96,19 @@ export async function updateUser(req, res) {
     if (b.active !== undefined) user.verified = Boolean(b.active);
 
     if (b.password) {
-      user.password = await bcrypt.hash(b.password, 10);
+      checkPassword(b.password);
+      const newHash = await bcrypt.hash(b.password, 10);
+      user.password = newHash;
+      user.passwordHistory = [newHash, ...(user.passwordHistory || []).slice(0, 4)];
     }
 
     await user.save();
     res.json({ message: 'User updated' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 }
+
 
 // DELETE /api/users/:id
 export async function deleteUser(req, res) {

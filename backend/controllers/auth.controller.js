@@ -7,7 +7,7 @@ import otpModel from "../models/otp.model.js";
 import sessionModel from "../models/session.model.js";
 import { sendEmail } from "../services/email.service.js";
 import { generateOtp, getOtphtml } from "../utils/utils.js";
-import { syncUserToMySQL } from "../utils/helpers.js";
+import { syncUserToMySQL, checkPassword, validEmail } from "../utils/helpers.js";
 
 // ✅ REGISTER
 export async function register(req, res) {
@@ -18,7 +18,21 @@ export async function register(req, res) {
       return res.status(400).json({ message: "Username, email, and password are required" });
     }
 
-    email = email.toLowerCase().trim();
+    username = String(username).trim();
+    if (username.length < 2 || username.length > 100) {
+      return res.status(400).json({ message: "Username must be between 2 and 100 characters" });
+    }
+
+    email = String(email).toLowerCase().trim();
+    if (!validEmail(email)) {
+      return res.status(400).json({ message: "A valid email address (max 254 characters) is required" });
+    }
+
+    try {
+      checkPassword(password);
+    } catch (pwErr) {
+      return res.status(400).json({ message: pwErr.message });
+    }
 
     // 🔍 Check existing user
     const isAlreadyRegistered = await userModel.findOne({
@@ -38,11 +52,12 @@ export async function register(req, res) {
     const userCount = await userModel.countDocuments();
     const role = userCount === 0 ? "Admin" : "Member";
 
-    // 👤 Create user in MongoDB
+    // 👤 Create user in MongoDB with password history initialized
     const user = await userModel.create({
       username,
       email,
       password: hashedPassword,
+      passwordHistory: [hashedPassword],
       role,
       verified: false,
     });
@@ -102,13 +117,24 @@ export async function login(req, res) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    email = email.toLowerCase().trim();
+    if (typeof password !== 'string' || password.length > 128) {
+      return res.status(400).json({ message: "Password exceeds maximum permitted length of 128 characters" });
+    }
+
+    email = String(email).toLowerCase().trim();
 
     const user = await userModel.findOne({ email });
 
     if (!user) {
       return res.status(401).json({
         message: "Invalid email or password",
+      });
+    }
+
+    // Check account-aware lockout state
+    if (user.isLocked && user.isLocked()) {
+      return res.status(429).json({
+        message: "Account is temporarily locked due to multiple failed login attempts. Please try again after 15 minutes.",
       });
     }
 
@@ -134,10 +160,19 @@ export async function login(req, res) {
     }
 
     if (!isPasswordValid) {
+      if (user.incrementFailedAttempts) {
+        await user.incrementFailedAttempts();
+      }
       return res.status(401).json({
         message: "Invalid email or password",
       });
     }
+
+    // Reset failed attempts upon successful authentication
+    if (user.resetFailedAttempts) {
+      await user.resetFailedAttempts();
+    }
+
 
     // Sync user with MySQL users table for foreign-key integrity in workspace
     const mysqlId = await syncUserToMySQL(user);

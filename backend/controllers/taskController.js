@@ -61,6 +61,16 @@ export async function createTask(req, res) {
   const b = req.body;
   need(b, 'project_id', 'title');
   await checkProject(req.user, b.project_id);
+
+  // Prevent duplicate task creation on rapid double-clicks (within 5 seconds)
+  const recentDuplicate = await one(
+    'SELECT task_id, priority FROM tasks WHERE project_id = ? AND title = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 5 SECOND)',
+    [parseInt(b.project_id), b.title.trim()]
+  );
+  if (recentDuplicate) {
+    return res.json({ message: `Task created with ${recentDuplicate.priority} priority`, task_id: recentDuplicate.task_id });
+  }
+
   const taskData = {
     deadline: b.deadline || null,
     estimated_hours: parseFloat(b.estimated_hours || 4),
@@ -84,6 +94,7 @@ export async function createTask(req, res) {
   if (taskData.assigned_to && taskData.assigned_to !== currentUid) {
     await notify(taskData.assigned_to, `📋 New task assigned: '${b.title}'`, `task/${tid}`);
   }
+
   await logActivity(req.user, parseInt(b.project_id), `created task '${b.title}' (${priority} priority)`);
   res.json({ message: `Task created with ${priority} priority`, task_id: tid });
 }

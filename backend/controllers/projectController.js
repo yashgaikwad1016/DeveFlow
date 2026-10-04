@@ -30,6 +30,16 @@ export async function createProject(req, res) {
     return res.status(400).json({ error: 'End date must be after start date' });
   }
   const mgr = req.user.role === 'Admin' && b.manager_id ? parseInt(b.manager_id) : (req.user.user_id || req.user.id);
+
+  // Prevent duplicate project creation on rapid double-clicks (within 5 seconds)
+  const recentDuplicate = await one(
+    'SELECT project_id FROM projects WHERE manager_id = ? AND project_name = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 5 SECOND)',
+    [mgr, b.project_name.trim()]
+  );
+  if (recentDuplicate) {
+    return res.json({ message: 'Project created', project_id: recentDuplicate.project_id });
+  }
+
   const result = await run(
     'INSERT INTO projects (project_name, description, start_date, end_date, status, manager_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [b.project_name.trim(), b.description || '', b.start_date || null, b.end_date || null, 'Active', mgr, now()]
@@ -42,6 +52,7 @@ export async function createProject(req, res) {
   await logActivity(req.user, pid, `created project '${b.project_name}'`);
   res.json({ message: 'Project created', project_id: pid });
 }
+
 
 // PUT /api/projects/:id
 export async function updateProject(req, res) {

@@ -1,5 +1,13 @@
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 dotenv.config();
+
 
 // Configuration environment loader
 const config = {
@@ -20,6 +28,12 @@ const config = {
   DB_USER: process.env.DB_USER || 'root',
   DB_PASSWORD: process.env.DB_PASSWORD || 'root',
   DB_NAME: process.env.DB_NAME || 'devflow',
+
+  // Razorpay Payment Configuration
+  RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+  RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
+  PAYMENT_CURRENCY: (process.env.PAYMENT_CURRENCY || 'USD').toUpperCase(),
 };
 
 if (!config.MONGO_URI) {

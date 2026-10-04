@@ -70,7 +70,7 @@ export async function getValidToken() {
   return refreshPromise;
 }
 
-// Request interceptor: ensure valid Authorization header
+// Request interceptor: ensure valid Authorization header and attach Idempotency-Key for state-changing operations
 api.interceptors.request.use(
   async (config) => {
     // Skip attaching/refreshing token for public auth endpoints
@@ -88,10 +88,19 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${validToken}`;
       }
     }
+
+    // Attach Idempotency-Key for state-changing requests if not explicitly specified
+    const method = (config.method || '').toLowerCase();
+    if (['post', 'put', 'delete'].includes(method) && !config.headers['Idempotency-Key']) {
+      const nonce = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      config.headers['Idempotency-Key'] = `req_${nonce}`;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
 );
+
 
 // Response interceptor: retry on 401 once with refresh
 api.interceptors.response.use(

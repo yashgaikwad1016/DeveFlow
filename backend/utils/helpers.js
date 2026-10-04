@@ -18,13 +18,21 @@ export async function projectIds(user) {
 // Build IN clause string safely
 export function inClause(ids) {
   if (!ids || ids.length === 0) return '(0)';
-  return '(' + ids.map(i => parseInt(i)).join(',') + ')';
+  const safeIds = ids.map(i => parseInt(i, 10)).filter(n => Number.isInteger(n) && n > 0);
+  if (safeIds.length === 0) return '(0)';
+  return '(' + safeIds.join(',') + ')';
 }
 
 // Check user has access to a specific project
 export async function checkProject(user, projectId) {
+  const pid = parseInt(projectId, 10);
+  if (isNaN(pid) || pid <= 0) {
+    const err = new Error("Invalid project ID");
+    err.statusCode = 400;
+    throw err;
+  }
   const ids = await projectIds(user);
-  if (!ids.includes(parseInt(projectId))) {
+  if (!ids.includes(pid)) {
     const err = new Error("You don't have access to this project");
     err.statusCode = 403;
     throw err;
@@ -37,19 +45,49 @@ export function pct(done, total) {
   return Math.round((100 * (done || 0)) / total);
 }
 
-// Validate email
+// Common weak passwords to prohibit
+const COMMON_WEAK_PASSWORDS = new Set([
+  'password', 'password123', 'admin123', '12345678', '123456789',
+  'qwerty1234', 'devflow123', 'welcome123', 'administrator'
+]);
+
+// Validate email (RFC 5321 length bounded to 254 chars to prevent ReDoS)
 export function validEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim();
+  if (trimmed.length < 5 || trimmed.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
 }
 
-// Validate password (min 8 chars, letters + numbers)
+// Validate password (8-128 chars, letters + numbers/symbols, no trivial weak passwords)
 export function checkPassword(password) {
-  if (!password || password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-    const err = new Error('Password must be at least 8 characters and contain letters and numbers');
+  if (!password || typeof password !== 'string') {
+    const err = new Error('Password is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (password.length < 8) {
+    const err = new Error('Password must be at least 8 characters long');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (password.length > 128) {
+    const err = new Error('Password cannot exceed 128 characters');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!/[A-Za-z]/.test(password) || !/[\d\W_]/.test(password)) {
+    const err = new Error('Password must contain both letters and at least one number or special character');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (COMMON_WEAK_PASSWORDS.has(password.toLowerCase())) {
+    const err = new Error('Password is too common or easily guessable. Please choose a stronger password.');
     err.statusCode = 400;
     throw err;
   }
 }
+
 
 // Get setting value from DB
 export async function getSetting(key, defaultVal = null) {

@@ -1,14 +1,21 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 
 import authRoutes from './routes/auth.routes.js';
+import profileRoutes from './routes/profile.js';
 import dashboardRoutes from './routes/dashboard.js';
 import userRoutes from './routes/users.js';
 import projectRoutes from './routes/projects.js';
@@ -18,12 +25,28 @@ import issueRoutes from './routes/issues.js';
 import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
 import aiRoutes from './routes/ai.js';
+import paymentRoutes from './routes/payments.js';
+import subscriptionRoutes from './routes/subscriptions.js';
+import paymentController from './controllers/paymentController.js';
+import { auth, requireRole } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 const app = express();
+
+// ── Security Headers ──────────────────────────────────────────────────────────
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('X-XSS-Protection', '1; mode=block');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (process.env.NODE_ENV === 'production') {
+    res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // ── Morgan Logger ─────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
@@ -43,6 +66,16 @@ app.use(cors({
   credentials: true,
 }));
 
+// ── Global API Rate Limiter (300 req / 15 min per IP) ────────────────────────
+const globalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', globalApiLimiter);
+
 // ── Cache-Control for sensitive API endpoints ─────────────────────────────────
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -51,9 +84,16 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// ── Body & Cookie parsers ─────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// ── Body & Cookie parsers (Hardened payload limits & raw body for webhooks) ──
+app.use(
+  express.json({
+    limit: '1mb',
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 
 // ── Static uploads (Hardened against MIME-sniffing & Stored XSS) ─────────────
@@ -69,6 +109,7 @@ app.use(
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
+app.use('/api', profileRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
@@ -79,6 +120,12 @@ app.use('/api', notificationRoutes);
 app.use('/api', reportRoutes);
 app.use('/api/ai', aiRoutes);
 
+// Payment & Subscription Routes
+app.use('/api/payments', paymentRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/admin/payments', auth, requireRole('Admin'), paymentController.getAdminPayments);
+app.use('/api/admin/payments/:paymentId', auth, requireRole('Admin'), paymentController.getPaymentById);
+
 // ── 404 for unknown API routes ────────────────────────────────────────────────
 app.use('/api/{*path}', (req, res) => {
   res.status(404).json({ error: 'API route not found' });
@@ -88,3 +135,4 @@ app.use('/api/{*path}', (req, res) => {
 app.use(errorHandler);
 
 export default app;
+

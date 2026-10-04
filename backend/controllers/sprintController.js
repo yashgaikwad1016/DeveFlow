@@ -43,6 +43,16 @@ export async function createSprint(req, res) {
   need(b, 'project_id', 'sprint_name', 'start_date', 'end_date');
   await checkProject(req.user, b.project_id);
   if (b.end_date < b.start_date) return res.status(400).json({ error: 'End date must be after start date' });
+
+  // Prevent duplicate sprint creation on rapid double-clicks
+  const recentDuplicate = await one(
+    'SELECT sprint_id FROM sprints WHERE project_id = ? AND sprint_name = ? AND start_date = ?',
+    [parseInt(b.project_id), b.sprint_name.trim(), b.start_date]
+  );
+  if (recentDuplicate) {
+    return res.json({ message: 'Sprint created', sprint_id: recentDuplicate.sprint_id });
+  }
+
   const result = await run(
     'INSERT INTO sprints (project_id, sprint_name, goal, start_date, end_date) VALUES (?, ?, ?, ?, ?)',
     [parseInt(b.project_id), b.sprint_name.trim(), b.goal || '', b.start_date, b.end_date]
@@ -50,6 +60,7 @@ export async function createSprint(req, res) {
   await logActivity(req.user, parseInt(b.project_id), `created sprint '${b.sprint_name}'`);
   res.json({ message: 'Sprint created', sprint_id: result.insertId });
 }
+
 
 // PUT /api/sprints/:id
 export async function updateSprint(req, res) {

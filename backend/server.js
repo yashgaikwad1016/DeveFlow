@@ -1,10 +1,19 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
+
 
 import app from './app.js';
 import connectDB from './config/database.js';
 import './config/db.js';
 import { seedAdminUser } from './utils/seedAdmin.js';
+import { initPaymentSchema } from './config/paymentSchema.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -15,6 +24,9 @@ async function startServer() {
 
     // Ensure fixed Admin account (DevFlow5173@admin.com) is seeded and active
     await seedAdminUser();
+
+    // Ensure MySQL payment tables and subscription plans are initialized
+    await initPaymentSchema();
 
     app.listen(PORT, () => {
       console.log(`🚀 DevFlow backend running on http://localhost:${PORT}`);

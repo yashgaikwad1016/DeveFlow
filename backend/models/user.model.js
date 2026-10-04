@@ -48,9 +48,43 @@ const userSchema = new mongoose.Schema({
     enum: ["local", "google", "github"],
     default: "local",
   },
+  failedLoginAttempts: {
+    type: Number,
+    default: 0,
+  },
+  lockUntil: {
+    type: Date,
+    default: null,
+  },
+  passwordHistory: {
+    type: [String],
+    default: [],
+  },
 }, {
   timestamps: true,
 });
+
+userSchema.methods.isLocked = function() {
+  return !!(this.lockUntil && this.lockUntil > Date.now());
+};
+
+userSchema.methods.incrementFailedAttempts = async function() {
+  this.failedLoginAttempts = (this.failedLoginAttempts || 0) + 1;
+  // If 5 or more consecutive failed attempts, lock account for 15 minutes
+  if (this.failedLoginAttempts >= 5) {
+    this.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+  }
+  return this.save();
+};
+
+userSchema.methods.resetFailedAttempts = async function() {
+  if (this.failedLoginAttempts > 0 || this.lockUntil) {
+    this.failedLoginAttempts = 0;
+    this.lockUntil = null;
+    return this.save();
+  }
+};
+
 
 const userModel = mongoose.models.users || mongoose.model("users", userSchema);
 

@@ -26,13 +26,23 @@ export async function createIssue(req, res) {
   const b = req.body;
   need(b, 'project_id', 'title');
   await checkProject(req.user, b.project_id);
+  const currentUid = req.user.user_id || req.user.id;
+
+  // Prevent duplicate issue creation on rapid double-clicks (within 5 seconds)
+  const recentDuplicate = await one(
+    'SELECT issue_id FROM issues WHERE project_id = ? AND title = ? AND reported_by = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 5 SECOND)',
+    [parseInt(b.project_id), b.title.trim(), currentUid]
+  );
+  if (recentDuplicate) {
+    return res.json({ message: 'Bug reported', issue_id: recentDuplicate.issue_id });
+  }
+
   let screenshot = null;
   if (req.file) {
     screenshot = `/uploads/${req.file.filename}`;
   } else if (b.screenshot && b.screenshot.startsWith('data:')) {
     screenshot = b.screenshot;
   }
-  const currentUid = req.user.user_id || req.user.id;
   const result = await run(
     `INSERT INTO issues (task_id, project_id, title, description, severity, status, assigned_to, reported_by, screenshot, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -47,6 +57,7 @@ export async function createIssue(req, res) {
   await logActivity(req.user, parseInt(b.project_id), `reported bug '${b.title}'`);
   res.json({ message: 'Bug reported', issue_id: result.insertId });
 }
+
 
 // PUT /api/issues/:id
 export async function updateIssue(req, res) {

@@ -34,9 +34,14 @@ const upload = multer({
   },
 });
 
+import { validateIssue, validateIntId } from '../middleware/validator.js';
+import { idempotency } from '../middleware/idempotency.js';
+
 router.get('/', auth, listIssues);
-router.post('/', auth, upload.single('screenshot'), createIssue);
-router.put('/:id', auth, updateIssue);
-router.delete('/:id', auth, deleteIssue);
+router.post('/', auth, idempotency(), upload.single('screenshot'), validateIssue(true), createIssue);
+router.put('/:id', validateIntId('id'), auth, validateIssue(false), updateIssue);
+router.delete('/:id', validateIntId('id'), auth, deleteIssue);
+
 
 export default router;
+

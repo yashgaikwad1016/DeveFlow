@@ -116,27 +116,13 @@ const Login = () => {
 
       if (isAdminMode) {
         toast.success(`Welcome back, Admin ${user?.name || user?.username}!`);
-        // 1) when on Admin Login, redirect to http://localhost:5173/dashboard
-        setTimeout(() => {
-          if (window.location.port === '5173') {
-            navigate('/dashboard', { replace: true });
-          } else {
-            const adminDashboardUrl = `http://localhost:5173/dashboard?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}`;
-            window.location.replace(adminDashboardUrl);
-          }
-        }, 400);
       } else {
-        toast.success('Login successful!');
-        // 2) when on Member Login, redirect to http://localhost:5174/dashboard
-        setTimeout(() => {
-          if (window.location.port === '5174') {
-            navigate('/dashboard', { replace: true });
-          } else {
-            const memberDashboardUrl = `http://localhost:5174/dashboard?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}`;
-            window.location.replace(memberDashboardUrl);
-          }
-        }, 400);
+        toast.success(`Welcome back, ${user?.name || user?.username || 'Member'}!`);
       }
+
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 400);
     } catch (error) {
       toast.error(error.response?.data?.message || error.response?.data?.error || 'Login failed');
     } finally {

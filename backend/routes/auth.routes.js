@@ -1,14 +1,24 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import * as authController from "../controllers/auth.controller.js";
+import { validateRegister, validateLogin } from "../middleware/validator.js";
 
 const authRouter = Router();
+
+// Rate limiter: Max 10 registration attempts per 15 minutes per IP
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many registration attempts from this IP, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Rate limiter: Max 5 resend attempts per 15 minutes per IP
 const resendOtpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  message: { message: "Too many OTP requests from this IP, please try again after 15 minutes" },
+  message: { error: "Too many OTP requests from this IP, please try again after 15 minutes" },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -17,7 +27,7 @@ const resendOtpLimiter = rateLimit({
 const verifyEmailLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
-  message: { message: "Too many verification attempts, please try again after 15 minutes" },
+  message: { error: "Too many verification attempts, please try again after 15 minutes" },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -26,7 +36,16 @@ const verifyEmailLimiter = rateLimit({
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
-  message: { message: "Too many login attempts, please try again after 15 minutes" },
+  message: { error: "Too many login attempts, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter: Max 20 OAuth attempts per 15 minutes per IP
+const oauthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many OAuth requests, please try again after 15 minutes" },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -34,12 +53,13 @@ const loginLimiter = rateLimit({
 /**
  * POST /api/auth/register
  */
-authRouter.post("/register", authController.register);
+authRouter.post("/register", registerLimiter, validateRegister, authController.register);
 
 /**
  * POST /api/auth/login
  */
-authRouter.post("/login", loginLimiter, authController.login);
+authRouter.post("/login", loginLimiter, validateLogin, authController.login);
+
 
 /**
  * GET /api/auth/get-me
@@ -74,7 +94,7 @@ authRouter.post("/resend-otp", resendOtpLimiter, authController.resendOTP);
 /**
  * POST /api/auth/google
  */
-authRouter.post("/google", authController.googleLogin);
+authRouter.post("/google", oauthLimiter, authController.googleLogin);
 
 /**
  * GET /api/auth/google-client-id
@@ -84,7 +104,8 @@ authRouter.get("/google-client-id", authController.getGoogleClientId);
 /**
  * POST /api/auth/github
  */
-authRouter.post("/github", authController.githubLogin);
+authRouter.post("/github", oauthLimiter, authController.githubLogin);
+
 
 /**
  * GET /api/auth/github-client-id

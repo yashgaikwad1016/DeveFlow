@@ -86,3 +86,31 @@ export const aiService = {
   getPerformance: (params) => api.get('/ai/performance', { params }).then(r => r.data),
   applyPriority: (id) => api.post(`/ai/apply/${id}`).then(r => r.data),
 };
+
+export const paymentService = {
+  getConfig: () => api.get('/payments/config').then(r => r.data),
+  getPlans: () => api.get('/payments/plans').then(r => r.data),
+  createOrder: (data) => api.post('/payments/create-order', data).then(r => r.data),
+  verifyPayment: (data) => api.post('/payments/verify', data).then(r => r.data),
+  getHistory: () => api.get('/payments/history').then(r => r.data),
+  getById: (id) => api.get(`/payments/${id}`).then(r => r.data),
+  downloadReceipt: (paymentId, receiptNumber) => {
+    return api.get(`/payments/${paymentId}/receipt`, { responseType: 'blob' }).then(response => {
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `DevFlow-Receipt-${receiptNumber || paymentId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    });
+  },
+  getAdminPayments: (params) => api.get('/admin/payments', { params }).then(r => r.data),
+};
+
+export const subscriptionService = {
+  getCurrent: () => api.get('/subscriptions/current').then(r => r.data),
+  cancel: () => api.post('/subscriptions/cancel').then(r => r.data),
+  changePlan: (data) => api.post('/subscriptions/change-plan', data).then(r => r.data),
+};

@@ -48,6 +48,9 @@ export default function Navbar() {
             <a className="landing-nav-link" onClick={() => scrollToSection('workflow')}>
               How It Works
             </a>
+            <Link to="/billing" className="landing-nav-link">
+              Pricing
+            </Link>
             <a className="landing-nav-link" onClick={() => scrollToSection('faq')}>
               FAQ
             </a>
@@ -113,6 +116,9 @@ export default function Navbar() {
             <a className="landing-nav-link" onClick={() => scrollToSection('workflow')}>
               How It Works
             </a>
+            <Link to="/billing" className="landing-nav-link" onClick={() => setMobileMenuOpen(false)}>
+              Pricing
+            </Link>
             <a className="landing-nav-link" onClick={() => scrollToSection('faq')}>
               FAQ
             </a>

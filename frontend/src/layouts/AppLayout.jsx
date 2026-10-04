@@ -11,6 +11,7 @@ import { ago } from '../utils/helpers';
 const NAV = [
   ['Overview', [
     ['dashboard', 'Dashboard', 'grid'],
+    ['billing', 'Billing & Plans', 'creditCard'],
   ]],
   ['Work', [
     ['projects', 'Projects', 'folder'],
@@ -25,6 +26,7 @@ const NAV = [
   ]],
   ['Administration', [
     ['users', 'Users', 'users', 'admin'],
+    ['admin/payments', 'Payment Logs', 'dollar', 'admin'],
     ['settings', 'Settings', 'settings', 'admin'],
   ]],
 ];
@@ -275,6 +277,7 @@ export default function AppLayout({ org }) {
                 </div>
                 <div className="menu">
                   <a onClick={() => { setPopover(null); navigate('/profile'); }}><Icon name="user" /> My profile</a>
+                  <a onClick={() => { setPopover(null); navigate('/billing'); }}><Icon name="creditCard" /> Billing & Plans</a>
                   <a onClick={() => { setPopover(null); navigate('/profile'); }}><Icon name="key" /> Change password</a>
                   <a onClick={handleSignOut}><Icon name="logout" /> Sign out</a>
                 </div>

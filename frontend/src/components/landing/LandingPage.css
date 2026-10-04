@@ -244,21 +244,40 @@
 .landing-nav-links {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 6px;
   list-style: none;
 }
 
 .landing-nav-link {
   color: var(--text-2);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
-  transition: color 0.15s ease;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  background-color: transparent;
+  transition: color 0.18s ease, background-color 0.18s ease, transform 0.12s ease;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
 }
 
+/* Light Theme Hover */
 .landing-nav-link:hover {
-  color: var(--primary);
+  color: var(--text);
+  background-color: rgba(15, 23, 42, 0.06);
+}
+
+/* Dark Theme Hover */
+[data-theme="dark"] .landing-nav-link:hover,
+:root:not([data-theme="light"]) .landing-nav-link:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.landing-nav-link:active {
+  transform: scale(0.97);
 }
 
 .landing-nav-actions {

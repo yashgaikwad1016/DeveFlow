@@ -34,12 +34,17 @@ const upload = multer({
   },
 });
 
+import { validateTask, validateIntId } from '../middleware/validator.js';
+import { idempotency } from '../middleware/idempotency.js';
+
 router.get('/', auth, requireRole('Admin'), listTasks);
-router.get('/:id', auth, requireRole('Admin'), getTaskDetail);
-router.post('/', auth, requireRole('Admin'), createTask);
-router.put('/:id', auth, requireRole('Admin'), updateTask);
-router.delete('/:id', auth, requireRole('Admin'), deleteTask);
-router.post('/:id/comments', auth, requireRole('Admin'), addComment);
-router.post('/:id/attachments', auth, requireRole('Admin'), upload.single('file'), addAttachment);
+router.get('/:id', validateIntId('id'), auth, requireRole('Admin'), getTaskDetail);
+router.post('/', auth, requireRole('Admin'), idempotency(), validateTask(true), createTask);
+router.put('/:id', validateIntId('id'), auth, requireRole('Admin'), validateTask(false), updateTask);
+router.delete('/:id', validateIntId('id'), auth, requireRole('Admin'), deleteTask);
+router.post('/:id/comments', validateIntId('id'), auth, requireRole('Admin'), idempotency(), addComment);
+router.post('/:id/attachments', validateIntId('id'), auth, requireRole('Admin'), upload.single('file'), addAttachment);
 
 export default router;
+
+

@@ -26,6 +26,8 @@ const ActivityPage = lazy(() => import('./pages/ActivityPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const BillingPage = lazy(() => import('./pages/BillingPage'));
+const AdminPaymentsPage = lazy(() => import('./pages/AdminPaymentsPage'));
 
 // Lightweight Suspense Loader
 function SuspenseFallback() {
@@ -178,6 +180,15 @@ export default function App() {
                     }
                   />
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/billing" element={<BillingPage />} />
+                  <Route
+                    path="/admin/payments"
+                    element={
+                      <RoleRoute role="admin">
+                        <AdminPaymentsPage />
+                      </RoleRoute>
+                    }
+                  />
                 </Route>
 
                 {/* Catch-all */}

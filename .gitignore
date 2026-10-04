@@ -39,6 +39,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS Files
+# OS & Local Database Files
 .DS_Store
 Thumbs.db
+*.db
