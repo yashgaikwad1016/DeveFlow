@@ -14,6 +14,7 @@ import connectDB from './config/database.js';
 import './config/db.js';
 import { seedAdminUser } from './utils/seedAdmin.js';
 import { initPaymentSchema } from './config/paymentSchema.js';
+import cronService from './services/cronService.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -27,6 +28,9 @@ async function startServer() {
 
     // Ensure MySQL payment tables and subscription plans are initialized
     await initPaymentSchema();
+
+    // Initialize automated background workers (daily subscription expiry & cleanup)
+    cronService.initCronJobs();
 
     app.listen(PORT, () => {
       console.log(`🚀 DevFlow backend running on http://localhost:${PORT}`);

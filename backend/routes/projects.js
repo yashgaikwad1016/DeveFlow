@@ -1,5 +1,6 @@
 import express from 'express';
 import { listProjects, createProject, updateProject, deleteProject, listMembers, addMember, removeMember } from '../controllers/projectController.js';
+import invitationController from '../controllers/invitationController.js';
 import { auth, requireRole } from '../middleware/auth.js';
 import { validateProject, validateIntId } from '../middleware/validator.js';
 import { idempotency } from '../middleware/idempotency.js';
@@ -14,6 +15,11 @@ router.get('/:id/members', validateIntId('id'), auth, listMembers);
 router.post('/:id/members', validateIntId('id'), auth, requireRole('Admin', 'Manager'), idempotency(), addMember);
 router.delete('/:id/members/:uid', validateIntId('id'), validateIntId('uid'), auth, requireRole('Admin', 'Manager'), removeMember);
 
+// Project Invitation Management
+router.get('/:id/invitations', validateIntId('id'), auth, requireRole('Admin', 'Manager'), invitationController.listInvitations);
+router.post('/:id/invitations', validateIntId('id'), auth, requireRole('Admin', 'Manager'), idempotency(), invitationController.createInvitation);
+router.delete('/:id/invitations/:inviteId', validateIntId('id'), validateIntId('inviteId'), auth, requireRole('Admin', 'Manager'), invitationController.revokeInvitation);
 
 export default router;
+
 

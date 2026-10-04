@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { projectService, userService } from '../services';
+import { projectService, userService, invitationService } from '../services';
 import { useModal, useConfirm, useToast } from '../components/Overlays';
 import { Badge, Person, Progress, Empty, LoadingSpinner } from '../components/UI';
 import Icon from '../components/Icon';
@@ -152,15 +152,23 @@ export default function ProjectsPage() {
   // Open Project Members Modal
   const openMembersModal = async (projectId, projectName) => {
     try {
-      const [members, allUsers] = await Promise.all([
+      const [members, allUsers, initialInvites] = await Promise.all([
         projectService.getMembers(projectId),
-        userService.list().catch(() => [])
+        userService.list().catch(() => []),
+        invitationService.list(projectId).catch(() => []),
       ]);
 
-      function MembersView({ initialMembers }) {
+      function MembersView({ initialMembers, initialInvitesList }) {
         const [mList, setMList] = useState(initialMembers);
+        const [invites, setInvites] = useState(initialInvitesList || []);
+        const [mode, setMode] = useState('existing'); // 'existing' | 'invite'
         const [selectedUser, setSelectedUser] = useState('');
         const [adding, setAdding] = useState(false);
+
+        // Invite form state
+        const [inviteEmail, setInviteEmail] = useState('');
+        const [inviteRole, setInviteRole] = useState('Member');
+        const [inviting, setInviting] = useState(false);
 
         const available = allUsers.filter(u => u.active && !mList.some(m => m.user_id === u.user_id));
 
@@ -181,6 +189,33 @@ export default function ProjectsPage() {
           }
         };
 
+        const handleSendInvite = async (e) => {
+          e.preventDefault();
+          if (!inviteEmail) return;
+          setInviting(true);
+          try {
+            await invitationService.send(projectId, { email: inviteEmail, role: inviteRole });
+            toast(`Invitation sent to ${inviteEmail}`, 'ok');
+            setInviteEmail('');
+            const updatedInvites = await invitationService.list(projectId);
+            setInvites(updatedInvites);
+          } catch (err) {
+            toast(err.response?.data?.error || err.message, 'err');
+          } finally {
+            setInviting(false);
+          }
+        };
+
+        const handleRevokeInvite = async (inviteId) => {
+          try {
+            await invitationService.revoke(projectId, inviteId);
+            setInvites(prev => prev.filter(i => i.invitation_id !== inviteId));
+            toast('Invitation revoked');
+          } catch (err) {
+            toast(err.message, 'err');
+          }
+        };
+
         const handleRemove = async (userId) => {
           try {
             await projectService.removeMember(projectId, userId);
@@ -192,35 +227,86 @@ export default function ProjectsPage() {
           }
         };
 
+        const pendingInvites = invites.filter(i => i.status === 'Pending');
+
         return (
           <div>
             <h2>Team · {projectName}</h2>
             <p className="lead">{mList.length} member{mList.length === 1 ? '' : 's'} assigned to this project</p>
 
             {isMgr() && (
-              <div className="composer" style={{ margin: '18px 0' }}>
-                <select
-                  value={selectedUser}
-                  onChange={e => setSelectedUser(e.target.value)}
-                  style={{ flex: 1 }}
-                >
-                  <option value="">Select a user to add...</option>
-                  {available.map(u => (
-                    <option key={u.user_id} value={u.user_id}>{u.name} ({u.designation || u.role})</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={!selectedUser || adding}
-                  onClick={handleAdd}
-                >
-                  <Icon name="plus" /> Add Member
-                </button>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className={`btn sm ${mode === 'existing' ? 'primary' : ''}`}
+                    onClick={() => setMode('existing')}
+                  >
+                    Select Existing User
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn sm ${mode === 'invite' ? 'primary' : ''}`}
+                    onClick={() => setMode('invite')}
+                  >
+                    <Icon name="msg" /> Invite by Email
+                  </button>
+                </div>
+
+                {mode === 'existing' ? (
+                  <div className="composer">
+                    <select
+                      value={selectedUser}
+                      onChange={e => setSelectedUser(e.target.value)}
+                      style={{ flex: 1 }}
+                    >
+                      <option value="">Select a user to add...</option>
+                      {available.map(u => (
+                        <option key={u.user_id} value={u.user_id}>{u.name} ({u.designation || u.role})</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={!selectedUser || adding}
+                      onClick={handleAdd}
+                    >
+                      <Icon name="plus" /> Add Member
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendInvite} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="email"
+                      placeholder="teammate@company.com"
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                      required
+                      style={{ flex: 2 }}
+                    />
+                    <select
+                      value={inviteRole}
+                      onChange={e => setInviteRole(e.target.value)}
+                      style={{ flex: 1 }}
+                    >
+                      <option value="Member">Member</option>
+                      <option value="Developer">Developer</option>
+                      <option value="QA">QA</option>
+                      <option value="Project Manager">Project Manager</option>
+                    </select>
+                    <button
+                      type="submit"
+                      className="btn primary"
+                      disabled={inviting || !inviteEmail}
+                    >
+                      {inviting ? 'Sending...' : 'Send Invite'}
+                    </button>
+                  </form>
+                )}
               </div>
             )}
 
-            <div className="list" style={{ maxHeight: 360, overflowY: 'auto' }}>
+            <div className="list" style={{ maxHeight: 260, overflowY: 'auto' }}>
               {mList.map(m => (
                 <div key={m.user_id} className="list-item">
                   <Person name={m.name} sub={`${m.designation || m.role} · ${m.email}`} />
@@ -239,14 +325,45 @@ export default function ProjectsPage() {
               ))}
             </div>
 
-            <div className="form-actions">
+            {/* Pending Invitations Section */}
+            {pendingInvites.length > 0 && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                <h4 style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8', marginBottom: 10 }}>
+                  Pending Email Invitations ({pendingInvites.length})
+                </h4>
+                <div className="list" style={{ maxHeight: 150, overflowY: 'auto' }}>
+                  {pendingInvites.map(inv => (
+                    <div key={inv.invitation_id} className="list-item" style={{ fontSize: 13 }}>
+                      <div>
+                        <strong>{inv.email}</strong>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>Role: {inv.role} · Expires in 7 days</div>
+                      </div>
+                      <div className="grow"></div>
+                      <Badge value="Pending" />
+                      {isMgr() && (
+                        <button
+                          className="btn sm"
+                          style={{ color: '#ef4444' }}
+                          title="Revoke invitation"
+                          onClick={() => handleRevokeInvite(inv.invitation_id)}
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="form-actions" style={{ marginTop: 20 }}>
               <button className="btn" onClick={closeModal}>Done</button>
             </div>
           </div>
         );
       }
 
-      openModal(<MembersView initialMembers={members} />);
+      openModal(<MembersView initialMembers={members} initialInvitesList={initialInvites} />);
     } catch (err) {
       toast(err.message, 'err');
     }

@@ -98,6 +98,13 @@ async function projectReport(req, res) {
 
 // GET /api/settings
 async function getSettings(req, res) {
+  if (req.user?.role !== 'Admin') {
+    // Non-admins only receive safe public workspace identity, never internal policies or admin configs
+    const rows = await query("SELECT `key`, value FROM settings WHERE `key` IN ('app_name', 'org_name')");
+    const s = {};
+    for (const r of rows) s[r.key] = r.value;
+    return res.json(s);
+  }
   const rows = await query("SELECT * FROM settings WHERE `key` != 'secret_key'");
   const s = {};
   for (const r of rows) s[r.key] = r.value;
@@ -107,16 +114,177 @@ async function getSettings(req, res) {
 // PUT /api/settings
 async function updateSettings(req, res) {
   const b = req.body;
-  for (const k of ['app_name', 'org_name', 'hours_per_day']) {
-    if (k in b) {
+  const allowedKeys = [
+    'app_name',
+    'org_name',
+    'support_email',
+    'hours_per_day',
+    'working_days_per_week',
+    'default_sprint_weeks',
+    'story_point_scale',
+    'default_task_priority',
+    'allow_member_project_creation',
+    'require_2fa',
+    'session_timeout_hours',
+    'auto_archive_completed_sprints',
+  ];
+
+  for (const k of allowedKeys) {
+    if (k in b && b[k] !== undefined && b[k] !== null) {
       await run(
         "INSERT INTO settings (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
         [k, String(b[k]).trim(), String(b[k]).trim()]
       );
     }
   }
-  res.json({ message: 'Settings saved' });
+
+  const rows = await query("SELECT * FROM settings WHERE `key` != 'secret_key'");
+  const updated = {};
+  for (const r of rows) updated[r.key] = r.value;
+
+  res.json({ message: 'Workspace settings saved successfully', settings: updated });
 }
 
-export { projectReport, getSettings, updateSettings };
-export default { projectReport, getSettings, updateSettings };
+// Helper to convert array of objects to CSV string
+function toCsv(rows, columns) {
+  const header = columns.map(c => `"${c.label.replace(/"/g, '""')}"`).join(',');
+  if (!rows || rows.length === 0) {
+    return header + '\r\n';
+  }
+
+  const lines = rows.map(row => {
+    return columns.map(c => {
+      let val = row[c.key];
+      if (val === null || val === undefined) return '""';
+      if (val instanceof Date) val = val.toISOString().slice(0, 19).replace('T', ' ');
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    }).join(',');
+  });
+
+  return [header, ...lines].join('\r\n');
+}
+
+// GET /api/reports/project/:id/export
+async function exportProjectCsv(req, res) {
+  const pid = parseInt(req.params.id);
+  await checkProject(req.user, pid);
+
+  const project = await one('SELECT project_name FROM projects WHERE project_id = ?', [pid]);
+  const tasks = await query(
+    `${TASK_SQL} WHERE t.project_id = ? ORDER BY t.task_id ASC`,
+    [pid]
+  );
+
+  const columns = [
+    { label: 'Task ID', key: 'task_id' },
+    { label: 'Project', key: 'project_name' },
+    { label: 'Sprint', key: 'sprint_name' },
+    { label: 'Task Title', key: 'title' },
+    { label: 'Status', key: 'status' },
+    { label: 'Priority', key: 'priority' },
+    { label: 'Assignee', key: 'assignee' },
+    { label: 'Est Hours', key: 'estimated_hours' },
+    { label: 'Logged Hours', key: 'logged_hours' },
+    { label: 'Deadline', key: 'deadline' },
+    { label: 'Created At', key: 'created_at' },
+  ];
+
+  const csvContent = toCsv(tasks, columns);
+  const safeProjectName = (project?.project_name || 'Project').replace(/[^a-zA-Z0-9-_]/g, '_');
+  const filename = `DevFlow-${safeProjectName}-Tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csvContent);
+}
+
+// GET /api/reports/sprint/:id/export
+async function exportSprintCsv(req, res) {
+  const sid = parseInt(req.params.id);
+  const sprint = await one('SELECT s.*, p.project_name FROM sprints s JOIN projects p USING(project_id) WHERE s.sprint_id = ?', [sid]);
+  if (!sprint) {
+    return res.status(404).json({ error: 'Sprint not found' });
+  }
+  await checkProject(req.user, sprint.project_id);
+
+  const tasks = await query(
+    `${TASK_SQL} WHERE t.sprint_id = ? ORDER BY t.task_id ASC`,
+    [sid]
+  );
+
+  const columns = [
+    { label: 'Task ID', key: 'task_id' },
+    { label: 'Sprint', key: 'sprint_name' },
+    { label: 'Project', key: 'project_name' },
+    { label: 'Task Title', key: 'title' },
+    { label: 'Status', key: 'status' },
+    { label: 'Priority', key: 'priority' },
+    { label: 'Assignee', key: 'assignee' },
+    { label: 'Est Hours', key: 'estimated_hours' },
+    { label: 'Logged Hours', key: 'logged_hours' },
+    { label: 'Deadline', key: 'deadline' },
+    { label: 'Created At', key: 'created_at' },
+  ];
+
+  const csvContent = toCsv(tasks, columns);
+  const safeSprintName = (sprint.sprint_name || 'Sprint').replace(/[^a-zA-Z0-9-_]/g, '_');
+  const filename = `DevFlow-${safeSprintName}-Tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csvContent);
+}
+
+// GET /api/reports/payments/export (Admin Only)
+async function exportPaymentsCsv(req, res) {
+  const payments = await query(
+    `SELECT 
+      p.payment_id,
+      p.receipt_number,
+      u.name AS user_name,
+      u.email AS user_email,
+      pl.name AS plan_name,
+      s.member_count,
+      p.amount,
+      p.currency,
+      p.status,
+      p.payment_method,
+      p.razorpay_payment_id,
+      p.razorpay_order_id,
+      p.payment_time,
+      p.created_at
+     FROM payments p
+     JOIN users u ON p.user_id = u.user_id
+     LEFT JOIN subscriptions s ON p.subscription_id = s.subscription_id
+     LEFT JOIN plans pl ON s.plan_id = pl.plan_id
+     ORDER BY p.payment_id DESC`
+  );
+
+  const columns = [
+    { label: 'Payment ID', key: 'payment_id' },
+    { label: 'Receipt Number', key: 'receipt_number' },
+    { label: 'Customer Name', key: 'user_name' },
+    { label: 'Customer Email', key: 'user_email' },
+    { label: 'Plan', key: 'plan_name' },
+    { label: 'Seats', key: 'member_count' },
+    { label: 'Amount', key: 'amount' },
+    { label: 'Currency', key: 'currency' },
+    { label: 'Status', key: 'status' },
+    { label: 'Method', key: 'payment_method' },
+    { label: 'Razorpay Payment ID', key: 'razorpay_payment_id' },
+    { label: 'Razorpay Order ID', key: 'razorpay_order_id' },
+    { label: 'Payment Date', key: 'payment_time' },
+    { label: 'Created At', key: 'created_at' },
+  ];
+
+  const csvContent = toCsv(payments, columns);
+  const filename = `DevFlow-Payments-${new Date().toISOString().slice(0, 10)}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csvContent);
+}
+
+export { projectReport, getSettings, updateSettings, exportProjectCsv, exportSprintCsv, exportPaymentsCsv };
+export default { projectReport, getSettings, updateSettings, exportProjectCsv, exportSprintCsv, exportPaymentsCsv };

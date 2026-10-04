@@ -3,12 +3,48 @@ import { pool, query, one, run, now } from '../config/db.js';
 import pricingService from '../services/pricingService.js';
 import razorpayService from '../services/razorpayService.js';
 import receiptService from '../services/receiptService.js';
+import { sendPaymentReceiptEmail } from '../services/email.service.js';
 
 // Helper to generate a unique SaaS receipt number
 function generateReceiptNumber() {
   const year = new Date().getFullYear();
   const rand = crypto.randomBytes(3).toString('hex').toUpperCase();
   return `DF-${year}-${rand}`;
+}
+
+// Asynchronously generates PDF receipt buffer and sends confirmation email
+async function dispatchReceiptEmailAsync(paymentId) {
+  try {
+    const payment = await one(
+      `SELECT 
+        p.*,
+        u.name AS user_name,
+        u.email AS user_email,
+        u.designation,
+        pl.name AS plan_name,
+        pl.code AS plan_code,
+        s.member_count,
+        s.billing_interval
+       FROM payments p
+       JOIN users u ON p.user_id = u.user_id
+       LEFT JOIN subscriptions s ON p.subscription_id = s.subscription_id
+       LEFT JOIN plans pl ON s.plan_id = pl.plan_id
+       WHERE p.payment_id = ?`,
+      [paymentId]
+    );
+
+    if (!payment || !payment.user_email) return;
+
+    const pdfBuffer = await receiptService.generateReceiptBuffer(payment);
+    await sendPaymentReceiptEmail({
+      to: payment.user_email,
+      userName: payment.user_name,
+      payment,
+      pdfBuffer,
+    });
+  } catch (err) {
+    console.error('⚠️ Could not send automated receipt email:', err.message);
+  }
 }
 
 export const paymentController = {
@@ -335,6 +371,9 @@ export const paymentController = {
 
       await conn.commit();
 
+      // Dispatch automated PDF tax receipt email asynchronously
+      dispatchReceiptEmailAsync(payment.payment_id);
+
       res.json({
         success: true,
         message: 'Payment verified and DevFlow subscription activated successfully!',
@@ -376,6 +415,7 @@ export const paymentController = {
     const entity = event.payload?.payment?.entity || event.payload?.order?.entity || {};
 
     const conn = await pool.getConnection();
+    let newSuccessPaymentId = null;
     try {
       await conn.beginTransaction();
 
@@ -420,6 +460,7 @@ export const paymentController = {
             const p = pmts[0];
             if (p.status !== 'Success') {
               const paymentMethod = entity.method || 'card';
+              newSuccessPaymentId = p.payment_id;
 
               await conn.query(
                 `UPDATE payments SET
@@ -500,6 +541,11 @@ export const paymentController = {
       );
 
       await conn.commit();
+
+      if (newSuccessPaymentId) {
+        dispatchReceiptEmailAsync(newSuccessPaymentId);
+      }
+
       res.status(200).json({ status: 'ok', message: 'Webhook processed successfully' });
     } catch (err) {
       await conn.rollback();

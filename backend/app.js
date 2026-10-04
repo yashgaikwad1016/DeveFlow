@@ -27,6 +27,8 @@ import reportRoutes from './routes/reports.js';
 import aiRoutes from './routes/ai.js';
 import paymentRoutes from './routes/payments.js';
 import subscriptionRoutes from './routes/subscriptions.js';
+import healthRoutes from './routes/health.js';
+import invitationRoutes from './routes/invitations.js';
 import paymentController from './controllers/paymentController.js';
 import { auth, requireRole } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -108,11 +110,13 @@ app.use(
 );
 
 // ── API Routes ────────────────────────────────────────────────────────────────
+app.use('/api', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api', profileRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/invitations', invitationRoutes);
 app.use('/api/sprints', sprintRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/issues', issueRoutes);

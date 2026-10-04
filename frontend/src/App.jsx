@@ -28,6 +28,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const BillingPage = lazy(() => import('./pages/BillingPage'));
 const AdminPaymentsPage = lazy(() => import('./pages/AdminPaymentsPage'));
+const AcceptInvitePage = lazy(() => import('./pages/AcceptInvitePage'));
 
 // Lightweight Suspense Loader
 function SuspenseFallback() {
@@ -130,6 +131,7 @@ export default function App() {
                     </PublicRoute>
                   }
                 />
+                <Route path="/invite/:token" element={<AcceptInvitePage />} />
 
                 {/* Protected App Routes */}
                 <Route element={<ProtectedLayout />}>
@@ -171,14 +173,7 @@ export default function App() {
                       </RoleRoute>
                     }
                   />
-                  <Route
-                    path="/settings"
-                    element={
-                      <RoleRoute role="admin">
-                        <SettingsPage />
-                      </RoleRoute>
-                    }
-                  />
+                  <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/billing" element={<BillingPage />} />
                   <Route

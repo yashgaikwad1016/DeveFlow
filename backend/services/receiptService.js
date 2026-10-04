@@ -19,7 +19,47 @@ export class ReceiptService {
     });
 
     doc.pipe(res);
+    ReceiptService._renderReceipt(doc, payment);
+    doc.end();
+  }
 
+  /**
+   * Generates a professional SaaS PDF receipt Buffer in-memory.
+   * Useful for attaching to confirmation emails or archiving.
+   *
+   * @param {object} payment
+   * @returns {Promise<Buffer>}
+   */
+  static generateReceiptBuffer(payment) {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+        info: {
+          Title: `DevFlow Receipt - ${payment.receipt_number}`,
+          Author: 'DevFlow Technologies',
+          Subject: 'Subscription Payment Receipt',
+        },
+      });
+
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err) => reject(err));
+
+      try {
+        ReceiptService._renderReceipt(doc, payment);
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  /**
+   * Internal renderer for DevFlow PDF receipts.
+   */
+  static _renderReceipt(doc, payment) {
     // Primary Colors
     const primaryColor = '#4f46e5'; // DevFlow Indigo
     const darkSlate = '#0f172a';
@@ -242,8 +282,6 @@ export class ReceiptService {
       .font('Helvetica')
       .fillColor('#94a3b8')
       .text('Thank you for choosing DevFlow to accelerate your team productivity.', 50, 750, { align: 'center' });
-
-    doc.end();
   }
 }
 

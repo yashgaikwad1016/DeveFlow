@@ -110,6 +110,27 @@ export async function initPaymentSchema() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // 5. project_invitations table (Workspace team invitation via email token)
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS project_invitations (
+        invitation_id INT AUTO_INCREMENT PRIMARY KEY,
+        project_id INT NOT NULL,
+        inviter_id INT NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'Member',
+        token VARCHAR(128) NOT NULL UNIQUE,
+        status ENUM('Pending', 'Accepted', 'Declined', 'Expired', 'Revoked') DEFAULT 'Pending',
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        INDEX idx_inv_proj (project_id),
+        INDEX idx_inv_token (token),
+        INDEX idx_inv_email (email),
+        CONSTRAINT fk_inv_proj FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+        CONSTRAINT fk_inv_user FOREIGN KEY (inviter_id) REFERENCES users(user_id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
     // Seed default plans if not already populated
     const [existingPlans] = await conn.query('SELECT COUNT(*) AS count FROM plans');
     if (existingPlans[0].count === 0) {

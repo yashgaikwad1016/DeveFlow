@@ -27,7 +27,7 @@ const NAV = [
   ['Administration', [
     ['users', 'Users', 'users', 'admin'],
     ['admin/payments', 'Payment Logs', 'dollar', 'admin'],
-    ['settings', 'Settings', 'settings', 'admin'],
+    ['settings', 'Workspace Settings', 'settings', 'admin'],
   ]],
 ];
 
@@ -277,6 +277,11 @@ export default function AppLayout({ org }) {
                 </div>
                 <div className="menu">
                   <a onClick={() => { setPopover(null); navigate('/profile'); }}><Icon name="user" /> My profile</a>
+                  {isAdmin() ? (
+                    <a onClick={() => { setPopover(null); navigate('/settings'); }}><Icon name="settings" /> Workspace Settings</a>
+                  ) : (
+                    <a onClick={() => { setPopover(null); navigate('/settings'); }}><Icon name="settings" /> Preferences</a>
+                  )}
                   <a onClick={() => { setPopover(null); navigate('/billing'); }}><Icon name="creditCard" /> Billing & Plans</a>
                   <a onClick={() => { setPopover(null); navigate('/profile'); }}><Icon name="key" /> Change password</a>
                   <a onClick={handleSignOut}><Icon name="logout" /> Sign out</a>

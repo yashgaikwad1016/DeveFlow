@@ -68,6 +68,50 @@ export const activityService = {
 export const reportService = {
   getProject: (id) => api.get(`/reports/project/${id}`).then(r => r.data),
   getSprint: (id) => api.get(`/reports/sprint/${id}`).then(r => r.data),
+  exportProjectCsv: (id, name = 'Project') => {
+    return api.get(`/reports/project/${id}/export`, { responseType: 'blob' }).then(response => {
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `DevFlow-${name.replace(/[^a-zA-Z0-9-_]/g, '_')}-Tasks.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    });
+  },
+  exportSprintCsv: (id, name = 'Sprint') => {
+    return api.get(`/reports/sprint/${id}/export`, { responseType: 'blob' }).then(response => {
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `DevFlow-${name.replace(/[^a-zA-Z0-9-_]/g, '_')}-Tasks.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    });
+  },
+  exportPaymentsCsv: () => {
+    return api.get(`/reports/payments/export`, { responseType: 'blob' }).then(response => {
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `DevFlow-Payments-${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    });
+  },
+};
+
+export const invitationService = {
+  list: (projectId) => api.get(`/projects/${projectId}/invitations`).then(r => r.data),
+  send: (projectId, data) => api.post(`/projects/${projectId}/invitations`, data).then(r => r.data),
+  revoke: (projectId, inviteId) => api.delete(`/projects/${projectId}/invitations/${inviteId}`).then(r => r.data),
+  verify: (token) => api.get(`/invitations/${token}`).then(r => r.data),
+  accept: (token) => api.post('/invitations/accept', { token }).then(r => r.data),
 };
 
 export const dashboardService = {
@@ -78,6 +122,10 @@ export const dashboardService = {
 export const settingsService = {
   get: () => api.get('/settings').then(r => r.data),
   update: (data) => api.put('/settings', data).then(r => r.data),
+};
+
+export const healthService = {
+  check: () => api.get('/health').then(r => r.data),
 };
 
 export const aiService = {

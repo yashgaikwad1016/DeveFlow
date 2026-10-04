@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { paymentService } from '../services';
+import { paymentService, reportService } from '../services';
 import Icon from '../components/Icon';
 import { Badge } from '../components/UI';
 
 export default function AdminPaymentsPage() {
   const [data, setData] = useState({ payments: [], pagination: {}, summary: {} });
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [plan, setPlan] = useState('');
@@ -61,19 +62,42 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  const handleExportCsv = async () => {
+    try {
+      setExporting(true);
+      toast.loading('Exporting financial report...', { id: 'admin-export' });
+      await reportService.exportPaymentsCsv();
+      toast.success('Payments CSV downloaded successfully', { id: 'admin-export' });
+    } catch (err) {
+      toast.error(err.message || 'Failed to export CSV', { id: 'admin-export' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const { payments = [], pagination = {}, summary = {} } = data;
   const currencySymbol = summary.currency === 'INR' ? '₹' : '$';
 
   return (
     <div className="admin-payments-page" style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-          Payment & Revenue Management
-        </h1>
-        <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-          Administrative audit logs, financial summaries, and transaction records.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+            Payment & Revenue Management
+          </h1>
+          <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+            Administrative audit logs, financial summaries, and transaction records.
+          </p>
+        </div>
+        <button
+          className="btn"
+          onClick={handleExportCsv}
+          disabled={exporting}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px' }}
+        >
+          <Icon name="download" /> {exporting ? 'Exporting...' : 'Export Payments CSV'}
+        </button>
       </div>
 
       {/* Summary Metrics Cards */}

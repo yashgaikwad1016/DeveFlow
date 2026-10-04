@@ -1,5 +1,6 @@
 import { query, one, run, now } from '../config/db.js';
 import { projectIds, inClause, checkProject, pct, need, toInt, notify, logActivity } from '../utils/helpers.js';
+import { verifyProjectSeatLimit } from '../middleware/subscriptionGuard.js';
 
 // GET /api/projects
 export async function listProjects(req, res) {
@@ -99,11 +100,36 @@ export async function addMember(req, res) {
   await checkProject(req.user, pid);
   need(req.body, 'user_id');
   const uid = parseInt(req.body.user_id);
+
+  // Check if user is already a member
+  const alreadyMember = await one(
+    'SELECT member_id FROM team_members WHERE user_id = ? AND project_id = ?',
+    [uid, pid]
+  );
+  if (alreadyMember) {
+    return res.json({ message: 'User is already a member of this project' });
+  }
+
+  // Check project manager's subscription seat limit
+  const p = await one('SELECT project_name, manager_id FROM projects WHERE project_id = ?', [pid]);
+  const managerId = p?.manager_id || req.user.user_id || req.user.id;
+
+  if (req.user.role !== 'Admin') {
+    const seatCheck = await verifyProjectSeatLimit(pid, managerId);
+    if (!seatCheck.allowed) {
+      return res.status(403).json({
+        error: seatCheck.error,
+        code: 'SEAT_LIMIT_REACHED',
+        limit: seatCheck.limit,
+        currentCount: seatCheck.currentCount,
+      });
+    }
+  }
+
   await run('INSERT IGNORE INTO team_members (user_id, project_id) VALUES (?, ?)', [uid, pid]);
-  const p = await one('SELECT project_name FROM projects WHERE project_id = ?', [pid]);
   await notify(uid, `You were added to project '${p.project_name}'`, 'projects');
   await logActivity(req.user, pid, 'added a member to the team');
-  res.json({ message: 'Member added' });
+  res.json({ message: 'Member added successfully' });
 }
 
 // DELETE /api/projects/:id/members/:uid

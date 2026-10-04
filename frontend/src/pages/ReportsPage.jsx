@@ -58,12 +58,33 @@ export default function ReportsPage() {
     }
   }, [selectedProj, selectedSprint, reportType, toast]);
 
+  const [exporting, setExporting] = useState(false);
+
   useEffect(() => {
     loadReport();
   }, [loadReport]);
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      setExporting(true);
+      if (reportType === 'project' && selectedProj) {
+        const currentProject = projects.find(p => String(p.project_id) === String(selectedProj));
+        await reportService.exportProjectCsv(selectedProj, currentProject?.project_name || 'Project');
+        toast('Project tasks CSV exported successfully', 'ok');
+      } else if (reportType === 'sprint' && selectedSprint) {
+        const currentSprint = sprints.find(s => String(s.sprint_id) === String(selectedSprint));
+        await reportService.exportSprintCsv(selectedSprint, currentSprint?.sprint_name || 'Sprint');
+        toast('Sprint tasks CSV exported successfully', 'ok');
+      }
+    } catch (err) {
+      toast(err.message || 'Failed to export CSV', 'err');
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (!projects.length && !loading) {
@@ -92,6 +113,9 @@ export default function ReportsPage() {
               Sprint Report
             </button>
           </div>
+          <button className="btn" onClick={handleExportCsv} disabled={exporting}>
+            <Icon name="download" /> {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
           <button className="btn" onClick={handlePrint}>
             <Icon name="file" /> Print / PDF
           </button>

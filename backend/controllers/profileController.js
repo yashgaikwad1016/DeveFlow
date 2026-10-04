@@ -20,8 +20,17 @@ export async function getProfile(req, res) {
 
     const mysqlId = req.user.user_id || req.user.id;
     let mysqlUser = null;
+    let userProjects = [];
     try {
       mysqlUser = await one(`SELECT ${USER_COLS} FROM users WHERE user_id = ?`, [mysqlId]);
+      userProjects = await query(
+        `SELECT p.project_id, p.project_name, p.status, p.created_at
+         FROM team_members tm
+         JOIN projects p ON tm.project_id = p.project_id
+         WHERE tm.user_id = ?
+         ORDER BY p.project_id DESC`,
+        [mysqlId]
+      );
     } catch (e) {}
 
     res.json({
@@ -35,6 +44,16 @@ export async function getProfile(req, res) {
       designation: user.designation || mysqlUser?.designation || '',
       verified: user.verified,
       created_at: user.createdAt,
+      last_login: mysqlUser?.last_login || null,
+      preferences: user.preferences || {
+        theme: 'system',
+        emailNotifications: true,
+        taskAssignmentAlerts: true,
+        dailyDigest: false,
+        compactView: false,
+        defaultLanding: 'dashboard',
+      },
+      projects: userProjects || [],
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -68,6 +87,14 @@ export async function updateProfile(req, res) {
 
     if (b.designation !== undefined && typeof b.designation === 'string') {
       user.designation = b.designation.trim().slice(0, 100);
+      profileUpdated = true;
+    }
+
+    if (b.preferences && typeof b.preferences === 'object') {
+      user.preferences = {
+        ...(user.preferences?.toObject ? user.preferences.toObject() : user.preferences || {}),
+        ...b.preferences,
+      };
       profileUpdated = true;
     }
 

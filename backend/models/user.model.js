@@ -60,6 +60,14 @@ const userSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  preferences: {
+    theme: { type: String, default: 'system' },
+    emailNotifications: { type: Boolean, default: true },
+    taskAssignmentAlerts: { type: Boolean, default: true },
+    dailyDigest: { type: Boolean, default: false },
+    compactView: { type: Boolean, default: false },
+    defaultLanding: { type: String, default: 'dashboard' },
+  },
 }, {
   timestamps: true,
 });
